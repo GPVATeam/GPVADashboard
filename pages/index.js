@@ -27,7 +27,7 @@ const Card = ({num,title,badge,badgeColor,children}) => (
     <div style={{background:C.ch2,padding:'11px 20px',display:'flex',alignItems:'center',gap:10}}>
       <div style={{width:20,height:20,borderRadius:'50%',background:C.blue,color:'#fff',fontSize:10,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>{num}</div>
       <div style={{color:'#fff',fontSize:11,fontWeight:600,letterSpacing:'.5px',textTransform:'uppercase'}}>{title}</div>
-      {badge && <div style={{marginLeft:'auto',fontSize:9,fontFamily:"'IBM Plex Mono',monospace",padding:'3px 8px',borderRadius:4,background:badgeColor==='blue'?'rgba(66,166,196,.25)':badgeColor==='tax'?'rgba(180,83,9,.25)':'rgba(107,115,112,.2)',color:badgeColor==='blue'?C.blue:badgeColor==='tax'?C.am:C.chlt,textTransform:'uppercase',fontWeight:600}}>{badge}</div>}
+      {badge&&<div style={{marginLeft:'auto',fontSize:9,fontFamily:"'IBM Plex Mono',monospace",padding:'3px 8px',borderRadius:4,background:badgeColor==='blue'?'rgba(66,166,196,.25)':badgeColor==='tax'?'rgba(180,83,9,.25)':'rgba(107,115,112,.2)',color:badgeColor==='blue'?C.blue:badgeColor==='tax'?C.am:C.chlt,textTransform:'uppercase',fontWeight:600}}>{badge}</div>}
     </div>
     <div style={{padding:20}}>{children}</div>
   </div>
@@ -48,98 +48,211 @@ const DOCS = [
   {n:"Lab Contract",d:"For rate and expiration analysis",t:"ops"},
 ]
 
+const EMPTY_FORM = {bizName:'',entity:'',statePractice:'',stateResidence:'',filingStatus:'',realEstate:'',retirement:'',pms:'',labContract:'',feeSchedule:'',bizEvents:'',personalEvents:'',numDVM:'',headcount:'',totalDebt:'',distributions:'',equipNeeds:'',visits:'',noshow:'',atv:'',ownerW2:'',ownerFedWH:'',ownerStWH:'',spouseW2:'',spouseFedWH:'',rentalIncome:''}
+const EMPTY_OWNER = {name:'',age:'',pct:'',salary:'',role:'',spouse:''}
+
 export default function Home() {
   const [page, setPage] = useState('intake')
-  const [owners, setOwners] = useState([{name:'',age:'',pct:'',salary:'',role:'',spouse:''}])
-  const [form, setForm] = useState({bizName:'',entity:'',statePractice:'',stateResidence:'',filingStatus:'',realEstate:'',retirement:'',pms:'',labContract:'',feeSchedule:'',bizEvents:'',personalEvents:'',numDVM:'',headcount:'',totalDebt:'',distributions:'',equipNeeds:'',visits:'',noshow:'',atv:'',ownerW2:'',ownerFedWH:'',ownerStWH:'',spouseW2:'',spouseFedWH:'',rentalIncome:''})
+  // intake state
+  const [owners, setOwners] = useState([{...EMPTY_OWNER}])
+  const [form, setForm] = useState({...EMPTY_FORM})
   const [taxData, setTaxData] = useState([{}])
   const [uploadedFiles, setUploadedFiles] = useState([])
   const [generating, setGenerating] = useState(false)
   const [genStatus, setGenStatus] = useState('')
   const [dashboardHtml, setDashboardHtml] = useState('')
   const [error, setError] = useState('')
+  const [editingClientId, setEditingClientId] = useState(null)
+  const [editingSubmissionId, setEditingSubmissionId] = useState(null)
+  // clients state
   const [clients, setClients] = useState([])
+  const [loadingClients, setLoadingClients] = useState(false)
+  // history / detail state
+  const [selectedClient, setSelectedClient] = useState(null)
+  const [clientHistory, setClientHistory] = useState([])
+  const [viewingDashboard, setViewingDashboard] = useState(null)
+  const [loadingHistory, setLoadingHistory] = useState(false)
   const fileInputRef = useRef()
 
   useEffect(()=>{
-    const t = owners.map((_,i)=>taxData[i]||{pte_q1:'',pte_q2:'',pte_q3:'',pte_q4:'',fran_q1:'',fran_q2:'',fran_q3:'',fran_q4:'',fed_q1:'',fed_q2:'',fed_q3:'',fed_q4:'',st_q1:'',st_q2:'',st_q3:'',st_q4:''})
+    const t=owners.map((_,i)=>taxData[i]||{pte_q1:'',pte_q2:'',pte_q3:'',pte_q4:'',fran_q1:'',fran_q2:'',fran_q3:'',fran_q4:'',fed_q1:'',fed_q2:'',fed_q3:'',fed_q4:'',st_q1:'',st_q2:'',st_q3:'',st_q4:''})
     setTaxData(t)
   },[owners.length])
 
-  useEffect(()=>{ if(page==='clients') loadClients() },[page])
+  useEffect(()=>{if(page==='clients')loadClients()},[page])
 
   async function loadClients() {
+    setLoadingClients(true)
     try {
-      const {data} = await supabase.from('clients').select('*,quarterly_submissions(id,quarter,year,status,created_at)').order('business_name')
+      const {data}=await supabase.from('clients').select('*,quarterly_submissions(id,quarter,year,status,created_at,dashboard_html)').order('business_name')
       setClients(data||[])
     } catch(e){console.error(e)}
+    setLoadingClients(false)
+  }
+
+  async function openClientHistory(client) {
+    setSelectedClient(client)
+    setLoadingHistory(true)
+    try {
+      const {data}=await supabase.from('quarterly_submissions')
+        .select('*')
+        .eq('client_id',client.id)
+        .order('created_at',{ascending:false})
+      setClientHistory(data||[])
+    } catch(e){console.error(e)}
+    setLoadingHistory(false)
+  }
+
+  // Load a past submission into the intake form for editing
+  async function editSubmission(client, submission) {
+    // Pre-fill form from client record
+    setForm({
+      bizName: client.business_name||'',
+      entity: client.entity_type||'',
+      statePractice: client.state_practice||'',
+      stateResidence: client.state_residence||'',
+      filingStatus: client.filing_status||'',
+      realEstate: client.real_estate||'',
+      retirement: client.retirement_plan||'',
+      pms: client.practice_software||'',
+      labContract: client.lab_contract||'',
+      feeSchedule: client.fee_schedule_updated||'',
+      bizEvents: submission.biz_events||'',
+      personalEvents: submission.personal_events||'',
+      numDVM: client.num_dvms?.toString()||'',
+      headcount: client.headcount?.toString()||'',
+      totalDebt: submission.total_debt||'',
+      distributions: submission.distributions||'',
+      equipNeeds: submission.equip_needs||'',
+      visits: submission.visits||'',
+      noshow: submission.noshow_rate||'',
+      atv: submission.atv||'',
+      ownerW2: submission.owner_w2_ytd||'',
+      ownerFedWH: submission.owner_fed_wh||'',
+      ownerStWH: submission.owner_state_wh||'',
+      spouseW2: submission.spouse_w2_ytd||'',
+      spouseFedWH: submission.spouse_fed_wh||'',
+      rentalIncome: submission.rental_income||''
+    })
+
+    // Load owners
+    try {
+      const {data:ownerData}=await supabase.from('owners').select('*').eq('client_id',client.id).order('sort_order')
+      if(ownerData&&ownerData.length>0) {
+        setOwners(ownerData.map(o=>({
+          name:o.name||'',age:o.age?.toString()||'',pct:o.ownership_pct||'',
+          salary:o.w2_salary||'',role:o.role||'',spouse:o.spouse_w2||''
+        })))
+      }
+    } catch(e){console.error(e)}
+
+    // Load tax data
+    if(submission.tax_estimates&&Array.isArray(submission.tax_estimates)) {
+      setTaxData(submission.tax_estimates)
+    }
+
+    setEditingClientId(client.id)
+    setEditingSubmissionId(submission.id)
+    setSelectedClient(null)
+    setDashboardHtml('')
+    setUploadedFiles([])
+    setError('')
+    setPage('intake')
+    window.scrollTo(0,0)
+  }
+
+  function newDashboard() {
+    setForm({...EMPTY_FORM})
+    setOwners([{...EMPTY_OWNER}])
+    setTaxData([{}])
+    setUploadedFiles([])
+    setDashboardHtml('')
+    setError('')
+    setEditingClientId(null)
+    setEditingSubmissionId(null)
+    setSelectedClient(null)
+    setPage('intake')
   }
 
   function updateOwner(i,f,v){const u=[...owners];u[i]={...u[i],[f]:v};setOwners(u)}
-  function addOwner(){setOwners([...owners,{name:'',age:'',pct:'',salary:'',role:'',spouse:''}])}
+  function addOwner(){setOwners([...owners,{...EMPTY_OWNER}])}
   function removeOwner(i){setOwners(owners.filter((_,idx)=>idx!==i))}
   function updateTax(i,f,v){const u=[...taxData];u[i]={...(u[i]||{}),[f]:v};setTaxData(u)}
-
-  function handleFileAdd(e) {
-    const newFiles = Array.from(e.target.files)
-    setUploadedFiles(prev=>{const ex=prev.map(f=>f.name);return [...prev,...newFiles.filter(f=>!ex.includes(f.name))]})
-    e.target.value=''
-  }
-
+  function handleFileAdd(e){const nf=Array.from(e.target.files);setUploadedFiles(prev=>{const ex=prev.map(f=>f.name);return[...prev,...nf.filter(f=>!ex.includes(f.name))]}); e.target.value=''}
   function removeFile(name){setUploadedFiles(prev=>prev.filter(f=>f.name!==name))}
 
-  function getMissing() {
+  function getMissing(){
     const m=[]
-    if(!form.bizName) m.push('Business Name')
-    if(!form.entity) m.push('Entity Type')
-    if(!form.statePractice) m.push('State of Practice')
-    if(!form.stateResidence) m.push('State of Residence')
-    if(!form.numDVM) m.push('Number of DVMs')
-    owners.forEach((o,i)=>{if(!o.name) m.push(`Owner ${i+1} Name`); if(!o.age) m.push(`Owner ${i+1} Age`)})
+    if(!form.bizName)m.push('Business Name')
+    if(!form.entity)m.push('Entity Type')
+    if(!form.statePractice)m.push('State of Practice')
+    if(!form.stateResidence)m.push('State of Residence')
+    if(!form.numDVM)m.push('Number of DVMs')
+    owners.forEach((o,i)=>{if(!o.name)m.push(`Owner ${i+1} Name`);if(!o.age)m.push(`Owner ${i+1} Age`)})
     return m
   }
 
-  async function handleGenerate() {
+  async function handleGenerate(){
     if(!form.bizName){setError('Enter a business name first');return}
     if(uploadedFiles.length===0){setError('Upload at least the P&L and payroll documents');return}
-    setError(''); setGenerating(true); setDashboardHtml('')
-
-    try {
+    setError('');setGenerating(true);setDashboardHtml('')
+    try{
       setGenStatus('Preparing documents...')
-      const fd = new FormData()
+      const fd=new FormData()
       Object.entries(form).forEach(([k,v])=>fd.append(k,v||''))
       fd.append('owners',JSON.stringify(owners))
       fd.append('taxData',JSON.stringify(taxData))
       fd.append('missingFields',JSON.stringify(getMissing()))
       fd.append('quarter','Q2')
       fd.append('year','2026')
+      if(editingClientId)fd.append('editingClientId',editingClientId)
       uploadedFiles.forEach(file=>fd.append('files',file))
-
       setGenStatus('Claude is reading your documents and building the dashboard...')
-
-      const res = await fetch('/api/generate',{method:'POST',body:fd})
-      const data = await res.json()
-
+      const res=await fetch('/api/generate',{method:'POST',body:fd})
+      const data=await res.json()
       if(!res.ok||data.error){setError(data.error||'Generation failed');setGenerating(false);return}
-
       setDashboardHtml(data.html)
       setGenStatus('Done!')
-    } catch(e){setError(e.message)}
+      loadClients()
+    }catch(e){setError(e.message)}
     setGenerating(false)
   }
 
-  function downloadDashboard() {
-    const blob = new Blob([dashboardHtml],{type:'text/html'})
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href=url; a.download=`${form.bizName.replace(/[^a-zA-Z0-9]/g,'_')}_GPVA_Dashboard_Q2_2026.html`; a.click()
+  function downloadDashboard(){
+    const blob=new Blob([dashboardHtml],{type:'text/html'})
+    const url=URL.createObjectURL(blob)
+    const a=document.createElement('a')
+    a.href=url;a.download=`${form.bizName.replace(/[^a-zA-Z0-9]/g,'_')}_GPVA_Dashboard_Q2_2026.html`;a.click()
     URL.revokeObjectURL(url)
   }
 
-  const filled = Object.values(form).filter(v=>v).length
-  const pct = Math.round((filled/Object.keys(form).length)*100)
-  const missing = getMissing()
-  const stateOpts = STATES.map(s=><option key={s} value={s}>{s}</option>)
+  function downloadHistoricalDashboard(submission, clientName) {
+    if(!submission.dashboard_html){alert('No dashboard saved for this submission');return}
+    const blob=new Blob([submission.dashboard_html],{type:'text/html'})
+    const url=URL.createObjectURL(blob)
+    const a=document.createElement('a')
+    a.href=url;a.download=`${clientName.replace(/[^a-zA-Z0-9]/g,'_')}_GPVA_${submission.quarter}_${submission.year}.html`;a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const filled=Object.values(form).filter(v=>v).length
+  const pct=Math.round((filled/Object.keys(form).length)*100)
+  const missing=getMissing()
+  const stateOpts=STATES.map(s=><option key={s} value={s}>{s}</option>)
+
+  const btn = (label, onClick, opts={}) => (
+    <button onClick={onClick} style={{
+      background:opts.color||C.blue,color:'#fff',border:'none',
+      padding:opts.sm?'8px 16px':'10px 20px',
+      borderRadius:7,fontFamily:"'Outfit',sans-serif",
+      fontSize:opts.sm?11:12,fontWeight:700,cursor:'pointer',
+      whiteSpace:'nowrap',...(opts.style||{})
+    }}>{label}</button>
+  )
+
+  const outlineBtn = (label, onClick) => (
+    <button onClick={onClick} style={{background:'transparent',color:C.t2,border:`1.5px solid ${C.bo}`,padding:'8px 16px',borderRadius:7,fontFamily:"'Outfit',sans-serif",fontSize:12,fontWeight:500,cursor:'pointer'}}>{label}</button>
+  )
 
   return (
     <>
@@ -150,6 +263,7 @@ export default function Home() {
     </Head>
     <div style={{fontFamily:"'Outfit',sans-serif",background:C.bg,color:C.tx,minHeight:'100vh'}}>
 
+      {/* HEADER */}
       <div style={{background:C.ch2,padding:'0 40px',display:'flex',justifyContent:'space-between',alignItems:'center',height:64,borderBottom:`3px solid ${C.blue}`,position:'sticky',top:0,zIndex:100}}>
         <div style={{display:'flex',alignItems:'center',gap:16}}>
           <img src={LOGO} style={{height:36,objectFit:'contain'}} alt="GPVA"/>
@@ -164,15 +278,32 @@ export default function Home() {
         </div>
       </div>
 
+      {/* NAV */}
       <div style={{background:C.s,borderBottom:`1px solid ${C.bo}`,padding:'0 40px',display:'flex'}}>
         {[['intake','New Dashboard'],['clients','All Clients']].map(([p,label])=>(
-          <button key={p} onClick={()=>{setPage(p);if(p==='intake'){setDashboardHtml('');setError('')}}} style={{padding:'12px 16px',fontSize:11,fontWeight:page===p?700:500,color:page===p?C.bd:C.t2,cursor:'pointer',border:'none',background:'none',borderBottom:page===p?`3px solid ${C.blue}`:'3px solid transparent',textTransform:'uppercase',letterSpacing:'.3px',fontFamily:"'Outfit',sans-serif"}}>{label}</button>
+          <button key={p} onClick={()=>{if(p==='intake')newDashboard();else{setPage(p);setSelectedClient(null);setViewingDashboard(null)}}} style={{padding:'12px 16px',fontSize:11,fontWeight:page===p?700:500,color:page===p?C.bd:C.t2,cursor:'pointer',border:'none',background:'none',borderBottom:page===p?`3px solid ${C.blue}`:'3px solid transparent',textTransform:'uppercase',letterSpacing:'.3px',fontFamily:"'Outfit',sans-serif"}}>{label}</button>
         ))}
       </div>
 
-      {page==='intake' && !dashboardHtml && (
+      {/* ═══ INTAKE PAGE ═══ */}
+      {page==='intake'&&!dashboardHtml&&(
         <div style={{maxWidth:960,margin:'0 auto',padding:'28px 40px 80px'}}>
 
+          {/* EDITING BANNER */}
+          {editingClientId&&(
+            <div style={{background:C.bl,border:`1px solid ${C.blue}`,borderRadius:10,padding:'12px 18px',marginBottom:20,display:'flex',alignItems:'center',justifyContent:'space-between',gap:12}}>
+              <div style={{display:'flex',alignItems:'center',gap:10}}>
+                <div style={{fontSize:18}}>✏️</div>
+                <div>
+                  <div style={{fontWeight:600,fontSize:13,color:C.bd}}>Editing: {form.bizName}</div>
+                  <div style={{fontSize:11,color:C.t2,marginTop:1}}>Pre-filled from last submission. Update any fields and upload new documents to regenerate.</div>
+                </div>
+              </div>
+              {outlineBtn('Cancel — Start Fresh', newDashboard)}
+            </div>
+          )}
+
+          {/* PROGRESS */}
           <div style={{background:C.s,borderRadius:10,border:`1px solid ${C.bo}`,padding:'14px 20px',marginBottom:20}}>
             <div style={{display:'flex',justifyContent:'space-between',marginBottom:8}}>
               <span style={{fontSize:11,fontWeight:600,textTransform:'uppercase',letterSpacing:'.5px',color:C.t2}}>Form Completion</span>
@@ -189,6 +320,7 @@ export default function Home() {
             </div>
           )}
 
+          {/* SECTION 1 */}
           <Card num="1" title="Practice Identity" badge="→ All Tabs" badgeColor="blue">
             <div style={g2}>
               <div style={fld}><label style={lbl}>Business Name *</label><input style={inp} value={form.bizName} onChange={e=>setForm({...form,bizName:e.target.value})} placeholder="e.g. Brown Pig Veterinary PLLC"/></div>
@@ -206,6 +338,7 @@ export default function Home() {
             </div>
           </Card>
 
+          {/* SECTION 2: OWNERS */}
           <Card num="2" title="Owner(s)">
             {owners.map((o,i)=>(
               <div key={i} style={{background:C.s2,borderRadius:10,border:`1px solid ${C.bo}`,padding:14,marginBottom:10}}>
@@ -226,6 +359,7 @@ export default function Home() {
             <button onClick={addOwner} style={{background:C.bl,color:C.bd,border:`1.5px dashed ${C.blue}`,padding:'9px 16px',borderRadius:6,fontFamily:"'Outfit',sans-serif",fontSize:12,fontWeight:600,cursor:'pointer',width:'100%',marginTop:8}}>+ Add Another Owner</button>
           </Card>
 
+          {/* SECTION 3: TAX */}
           <Card num="3" title="State Tax Estimates" badge="→ Tax Planning Tab" badgeColor="tax">
             <div style={{fontSize:11.5,color:C.t2,marginBottom:14,padding:'8px 12px',background:C.s2,borderRadius:6,borderLeft:`3px solid ${C.blue}`}}>State estimated taxes only — no federal business estimates for S-Corp structures.</div>
             {owners.map((o,i)=>(
@@ -235,8 +369,7 @@ export default function Home() {
                   <div key={label} style={{marginBottom:10}}>
                     <div style={{fontSize:10,fontWeight:700,textTransform:'uppercase',letterSpacing:'.5px',color:C.t2,margin:'8px 0 6px'}}>{label}</div>
                     <div style={{display:'grid',gridTemplateColumns:'110px repeat(4,1fr)',gap:6,alignItems:'center'}}>
-                      <div/>
-                      {['Q1','Q2','Q3','Q4'].map(q=><div key={q} style={{fontSize:9,textTransform:'uppercase',color:C.t3,textAlign:'center',fontWeight:600}}>{q}</div>)}
+                      <div/>{['Q1','Q2','Q3','Q4'].map(q=><div key={q} style={{fontSize:9,textTransform:'uppercase',color:C.t3,textAlign:'center',fontWeight:600}}>{q}</div>)}
                       <div style={{fontSize:11,fontWeight:600,color:C.t2}}>Paid</div>
                       {fields.map(f=><input key={f} style={{...inp,textAlign:'center',fontFamily:"'IBM Plex Mono',monospace",fontSize:12,padding:'7px 4px'}} value={taxData[i]?.[f]||''} onChange={e=>updateTax(i,f,e.target.value)} placeholder="$0"/>)}
                       <div style={{fontSize:11,fontWeight:600,color:C.t2}}>Due</div>
@@ -259,6 +392,7 @@ export default function Home() {
             </div>
           </Card>
 
+          {/* SECTION 4: OPERATIONS */}
           <Card num="4" title="Operations & Financial Context">
             <div style={g3}>
               <div style={fld}><label style={lbl}>DVMs (FTE) *</label><input style={inp} type="number" value={form.numDVM} onChange={e=>setForm({...form,numDVM:e.target.value})} placeholder="0"/></div>
@@ -277,9 +411,11 @@ export default function Home() {
             </div>
           </Card>
 
+          {/* SECTION 5: DOCUMENTS */}
           <Card num="5" title="Upload Financial Documents" badge="→ Claude reads these automatically" badgeColor="blue">
             <div style={{fontSize:11.5,color:C.t2,marginBottom:16,padding:'10px 14px',background:C.bl,borderRadius:6,borderLeft:`3px solid ${C.blue}`}}>
-              <strong>Upload your files here.</strong> Claude reads them automatically and builds the dashboard. No copy/paste. Export from QBO as .xlsx or .csv. Paystubs can be PDF.
+              <strong>Upload your files here.</strong> Claude reads them automatically. Export from QBO as .xlsx or .csv. Paystubs can be PDF.
+              {editingClientId&&<span style={{color:C.am,fontWeight:600}}> You must re-upload documents even when editing — files are not stored between sessions.</span>}
             </div>
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:16}}>
               {DOCS.map((d,i)=>{
@@ -295,13 +431,7 @@ export default function Home() {
                 )
               })}
             </div>
-            <div
-              onClick={()=>fileInputRef.current?.click()}
-              onDragOver={e=>{e.preventDefault();e.currentTarget.style.borderColor=C.blue;e.currentTarget.style.background=C.bl}}
-              onDragLeave={e=>{e.currentTarget.style.borderColor=C.bo;e.currentTarget.style.background=C.s2}}
-              onDrop={e=>{e.preventDefault();e.currentTarget.style.borderColor=C.bo;e.currentTarget.style.background=C.s2;const files=Array.from(e.dataTransfer.files);setUploadedFiles(prev=>{const ex=prev.map(f=>f.name);return[...prev,...files.filter(f=>!ex.includes(f.name))]})}}
-              style={{border:`2px dashed ${C.bo}`,borderRadius:10,padding:'32px 20px',textAlign:'center',cursor:'pointer',background:C.s2,transition:'all .15s',marginBottom:uploadedFiles.length>0?12:0}}
-            >
+            <div onClick={()=>fileInputRef.current?.click()} onDragOver={e=>{e.preventDefault();e.currentTarget.style.borderColor=C.blue;e.currentTarget.style.background=C.bl}} onDragLeave={e=>{e.currentTarget.style.borderColor=C.bo;e.currentTarget.style.background=C.s2}} onDrop={e=>{e.preventDefault();e.currentTarget.style.borderColor=C.bo;e.currentTarget.style.background=C.s2;const files=Array.from(e.dataTransfer.files);setUploadedFiles(prev=>{const ex=prev.map(f=>f.name);return[...prev,...files.filter(f=>!ex.includes(f.name))]})}} style={{border:`2px dashed ${C.bo}`,borderRadius:10,padding:'32px 20px',textAlign:'center',cursor:'pointer',background:C.s2,transition:'all .15s',marginBottom:uploadedFiles.length>0?12:0}}>
               <div style={{fontSize:32,marginBottom:8}}>📁</div>
               <div style={{fontWeight:600,fontSize:14,color:C.tx,marginBottom:4}}>Click to upload or drag and drop files here</div>
               <div style={{fontSize:12,color:C.t2}}>P&L, Payroll, Balance Sheet, IDEXX reports, Paystubs</div>
@@ -310,7 +440,7 @@ export default function Home() {
             <input ref={fileInputRef} type="file" multiple accept=".xlsx,.csv,.pdf,.xls" onChange={handleFileAdd} style={{display:'none'}}/>
             {uploadedFiles.length>0&&(
               <div style={{background:C.s,border:`1px solid ${C.bo}`,borderRadius:8,overflow:'hidden'}}>
-                <div style={{padding:'8px 14px',background:C.s2,fontSize:10,fontWeight:700,textTransform:'uppercase',letterSpacing:'.5px',color:C.t2}}>{uploadedFiles.length} file{uploadedFiles.length!==1?'s':''} ready to send</div>
+                <div style={{padding:'8px 14px',background:C.s2,fontSize:10,fontWeight:700,textTransform:'uppercase',letterSpacing:'.5px',color:C.t2}}>{uploadedFiles.length} file{uploadedFiles.length!==1?'s':''} ready</div>
                 {uploadedFiles.map(file=>(
                   <div key={file.name} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'9px 14px',borderTop:`1px solid ${C.bo}`}}>
                     <div style={{display:'flex',alignItems:'center',gap:8}}>
@@ -328,13 +458,13 @@ export default function Home() {
 
           <div style={{background:C.s,borderRadius:10,border:`1px solid ${C.bo}`,padding:'20px 24px',display:'flex',alignItems:'center',gap:16,justifyContent:'space-between',boxShadow:'0 1px 3px rgba(0,0,0,.06),0 4px 16px rgba(0,0,0,.05)'}}>
             <div style={{fontSize:12,color:C.t2,lineHeight:1.6}}>
-              <strong style={{color:C.tx}}>Ready?</strong> Fill in the form above, upload your financial documents, and click Generate. Claude reads everything automatically and builds the complete 9-tab dashboard. Takes 2–4 minutes.
+              <strong style={{color:C.tx}}>{editingClientId?`Updating ${form.bizName}:`:'Ready?'}</strong> Fill in the form, upload financial documents, and click Generate. Claude reads everything and builds the complete 9-tab dashboard in 2–4 minutes.
               {uploadedFiles.length===0&&<span style={{color:C.am,fontWeight:600}}> Upload documents first.</span>}
             </div>
             <div style={{display:'flex',gap:10,flexShrink:0}}>
-              <button onClick={()=>{setForm(Object.fromEntries(Object.keys(form).map(k=>[k,''])));setOwners([{name:'',age:'',pct:'',salary:'',role:'',spouse:''}]);setUploadedFiles([]);setError('')}} style={{background:'transparent',color:C.t2,border:`1.5px solid ${C.bo}`,padding:'12px 16px',borderRadius:7,fontFamily:"'Outfit',sans-serif",fontSize:12,fontWeight:500,cursor:'pointer'}}>Clear</button>
+              {outlineBtn('Clear',newDashboard)}
               <button onClick={handleGenerate} disabled={generating||uploadedFiles.length===0} style={{background:generating?C.chlt:C.blue,color:'#fff',border:'none',padding:'14px 32px',borderRadius:8,fontFamily:"'Outfit',sans-serif",fontSize:14,fontWeight:700,cursor:generating||uploadedFiles.length===0?'not-allowed':'pointer',whiteSpace:'nowrap',minWidth:220,transition:'background .15s'}}>
-                {generating?genStatus:'Generate Dashboard →'}
+                {generating?genStatus:editingClientId?'Regenerate Dashboard →':'Generate Dashboard →'}
               </button>
             </div>
           </div>
@@ -350,18 +480,19 @@ export default function Home() {
         </div>
       )}
 
+      {/* ═══ DASHBOARD OUTPUT ═══ */}
       {page==='intake'&&dashboardHtml&&(
         <div style={{maxWidth:960,margin:'0 auto',padding:'28px 40px 80px'}}>
           <div style={{background:C.gnl,border:`1px solid ${C.gn}`,borderRadius:10,padding:'16px 20px',marginBottom:20,display:'flex',alignItems:'center',justifyContent:'space-between',gap:16}}>
             <div style={{display:'flex',alignItems:'center',gap:12}}>
               <div style={{fontSize:24}}>✓</div>
               <div>
-                <div style={{fontWeight:700,color:C.gn,fontSize:15}}>Dashboard Generated Successfully</div>
+                <div style={{fontWeight:700,color:C.gn,fontSize:15}}>Dashboard Generated — {form.bizName}</div>
                 <div style={{fontSize:12,color:C.t2,marginTop:2}}>Saved to database · Download and upload to SmartVault for client delivery</div>
               </div>
             </div>
             <div style={{display:'flex',gap:10,flexShrink:0}}>
-              <button onClick={()=>{setDashboardHtml('');setUploadedFiles([])}} style={{background:'transparent',color:C.t2,border:`1.5px solid ${C.bo}`,padding:'10px 18px',borderRadius:7,fontFamily:"'Outfit',sans-serif",fontSize:13,fontWeight:500,cursor:'pointer'}}>← New Dashboard</button>
+              {outlineBtn('← New Dashboard', newDashboard)}
               <button onClick={downloadDashboard} style={{background:C.gn,color:'#fff',border:'none',padding:'10px 24px',borderRadius:7,fontFamily:"'Outfit',sans-serif",fontSize:13,fontWeight:700,cursor:'pointer'}}>⬇ Download HTML</button>
             </div>
           </div>
@@ -371,16 +502,19 @@ export default function Home() {
         </div>
       )}
 
-      {page==='clients'&&(
+      {/* ═══ CLIENTS LIST ═══ */}
+      {page==='clients'&&!selectedClient&&!viewingDashboard&&(
         <div style={{maxWidth:960,margin:'0 auto',padding:'28px 40px 80px'}}>
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:20}}>
             <div>
               <div style={{fontFamily:"'EB Garamond',serif",fontSize:22,fontWeight:600,color:C.ch}}>All Clients</div>
               <div style={{fontSize:12,color:C.t2,marginTop:2}}>{clients.length} client{clients.length!==1?'s':''} on record</div>
             </div>
-            <button onClick={()=>setPage('intake')} style={{background:C.blue,color:'#fff',border:'none',padding:'10px 20px',borderRadius:8,fontFamily:"'Outfit',sans-serif",fontSize:12,fontWeight:700,cursor:'pointer'}}>+ New Dashboard</button>
+            <button onClick={newDashboard} style={{background:C.blue,color:'#fff',border:'none',padding:'10px 20px',borderRadius:8,fontFamily:"'Outfit',sans-serif",fontSize:12,fontWeight:700,cursor:'pointer'}}>+ New Dashboard</button>
           </div>
-          {clients.length===0?(
+          {loadingClients?(
+            <div style={{textAlign:'center',padding:60,color:C.t3}}>Loading...</div>
+          ):clients.length===0?(
             <div style={{textAlign:'center',padding:60}}>
               <div style={{fontSize:48,marginBottom:16}}>🏥</div>
               <div style={{fontFamily:"'EB Garamond',serif",fontSize:22,color:C.ch,marginBottom:8}}>No clients yet</div>
@@ -390,7 +524,7 @@ export default function Home() {
             const subs=c.quarterly_submissions||[]
             const latest=subs.sort((a,b)=>new Date(b.created_at)-new Date(a.created_at))[0]
             return(
-              <div key={c.id} style={{background:C.s,borderRadius:10,border:`1px solid ${C.bo}`,padding:'16px 20px',boxShadow:'0 1px 3px rgba(0,0,0,.06)',display:'flex',alignItems:'center',justifyContent:'space-between',gap:16,marginBottom:10}}>
+              <div key={c.id} style={{background:C.s,borderRadius:10,border:`1px solid ${C.bo}`,padding:'16px 20px',boxShadow:'0 1px 3px rgba(0,0,0,.06)',display:'flex',alignItems:'center',justifyContent:'space-between',gap:16,marginBottom:10,cursor:'pointer'}} onClick={()=>openClientHistory(c)}>
                 <div style={{flex:1}}>
                   <div style={{fontWeight:600,fontSize:14,color:C.tx}}>{c.business_name}</div>
                   <div style={{fontSize:11,color:C.t2,marginTop:3}}>{[c.entity_type,c.state_practice&&'· '+c.state_practice,c.num_dvms&&'· '+c.num_dvms+' DVMs','· '+subs.length+' submission'+(subs.length!==1?'s':'')].filter(Boolean).join(' ')}</div>
@@ -400,12 +534,110 @@ export default function Home() {
                   {c.entity_type&&<span style={{fontSize:9,fontWeight:600,padding:'3px 8px',borderRadius:4,fontFamily:"'IBM Plex Mono',monospace",background:C.s2,color:C.chlt}}>{c.entity_type}</span>}
                   {latest&&<span style={{fontSize:9,fontWeight:600,padding:'3px 8px',borderRadius:4,fontFamily:"'IBM Plex Mono',monospace",background:C.gnl,color:C.gn}}>Last: {latest.quarter} {latest.year}</span>}
                 </div>
-                <button onClick={()=>setPage('intake')} style={{background:C.bl,color:C.bd,border:'none',padding:'8px 16px',borderRadius:6,fontFamily:"'Outfit',sans-serif",fontSize:12,fontWeight:600,cursor:'pointer'}}>New Quarter →</button>
+                <div style={{fontSize:12,color:C.bd,fontWeight:600}}>View History →</div>
               </div>
             )
           })}
         </div>
       )}
+
+      {/* ═══ CLIENT HISTORY ═══ */}
+      {page==='clients'&&selectedClient&&!viewingDashboard&&(
+        <div style={{maxWidth:960,margin:'0 auto',padding:'28px 40px 80px'}}>
+          <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:24}}>
+            <button onClick={()=>setSelectedClient(null)} style={{background:'none',border:'none',color:C.t2,cursor:'pointer',fontSize:13,fontWeight:500}}>← All Clients</button>
+            <div style={{width:1,height:16,background:C.bo}}/>
+            <div>
+              <div style={{fontFamily:"'EB Garamond',serif",fontSize:22,fontWeight:600,color:C.ch}}>{selectedClient.business_name}</div>
+              <div style={{fontSize:12,color:C.t2,marginTop:2}}>{[selectedClient.entity_type,selectedClient.state_practice,selectedClient.num_dvms&&selectedClient.num_dvms+' DVMs'].filter(Boolean).join(' · ')}</div>
+            </div>
+            <div style={{marginLeft:'auto',display:'flex',gap:10}}>
+              <button onClick={()=>{setEditingClientId(selectedClient.id);editSubmission(selectedClient,clientHistory[0]||{})}} style={{background:C.bl,color:C.bd,border:'none',padding:'9px 18px',borderRadius:7,fontFamily:"'Outfit',sans-serif",fontSize:12,fontWeight:600,cursor:'pointer'}}>✏️ Edit &amp; Regenerate</button>
+              <button onClick={newDashboard} style={{background:C.blue,color:'#fff',border:'none',padding:'9px 18px',borderRadius:7,fontFamily:"'Outfit',sans-serif",fontSize:12,fontWeight:700,cursor:'pointer'}}>+ New Quarter</button>
+            </div>
+          </div>
+
+          {/* CLIENT PROFILE SUMMARY */}
+          <div style={{background:C.s,borderRadius:10,border:`1px solid ${C.bo}`,padding:20,marginBottom:20,boxShadow:'0 1px 3px rgba(0,0,0,.06)'}}>
+            <div style={{fontSize:11,fontWeight:700,textTransform:'uppercase',letterSpacing:'.5px',color:C.t2,marginBottom:14}}>Client Profile</div>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:16}}>
+              {[['Entity',selectedClient.entity_type],['Practice State',selectedClient.state_practice],['Residence State',selectedClient.state_residence],['DVMs',selectedClient.num_dvms],['Headcount',selectedClient.headcount],['Retirement',selectedClient.retirement_plan],['Software',selectedClient.practice_software],['Lab Contract',selectedClient.lab_contract]].map(([k,v])=>v?(
+                <div key={k}>
+                  <div style={{fontSize:10,color:C.t3,textTransform:'uppercase',letterSpacing:'.5px',marginBottom:2}}>{k}</div>
+                  <div style={{fontSize:13,fontWeight:500,color:C.tx}}>{v}</div>
+                </div>
+              ):null)}
+            </div>
+          </div>
+
+          {/* SUBMISSION HISTORY */}
+          <div style={{fontFamily:"'EB Garamond',serif",fontSize:18,fontWeight:600,color:C.ch,marginBottom:16}}>Submission History</div>
+          {loadingHistory?(
+            <div style={{textAlign:'center',padding:40,color:C.t3}}>Loading history...</div>
+          ):clientHistory.length===0?(
+            <div style={{textAlign:'center',padding:40,background:C.s,borderRadius:10,border:`1px solid ${C.bo}`}}>
+              <div style={{fontSize:13,color:C.t2}}>No submissions yet for this client</div>
+            </div>
+          ):clientHistory.map((sub,i)=>{
+            const hasHtml=!!sub.dashboard_html
+            const date=new Date(sub.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})
+            return(
+              <div key={sub.id} style={{background:C.s,borderRadius:10,border:`1px solid ${C.bo}`,padding:'16px 20px',boxShadow:'0 1px 3px rgba(0,0,0,.06)',marginBottom:10}}>
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12}}>
+                  <div style={{display:'flex',alignItems:'center',gap:14}}>
+                    <div style={{width:40,height:40,borderRadius:8,background:i===0?C.blue:C.s2,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                      <div style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:10,fontWeight:700,color:i===0?'#fff':C.t2,textAlign:'center',lineHeight:1.2}}>
+                        <div>{sub.quarter}</div>
+                        <div>{sub.year}</div>
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{fontWeight:600,fontSize:14,color:C.tx}}>{sub.quarter} {sub.year} {i===0&&<span style={{fontSize:10,background:C.bl,color:C.bd,padding:'1px 6px',borderRadius:4,marginLeft:6,fontWeight:600}}>Latest</span>}</div>
+                      <div style={{fontSize:11,color:C.t2,marginTop:2}}>Submitted {date} · {sub.submitted_by||'Staff'}</div>
+                      {sub.biz_events&&<div style={{fontSize:11,color:C.t3,marginTop:2,maxWidth:400}}>Events: {sub.biz_events.substring(0,80)}{sub.biz_events.length>80?'...':''}</div>}
+                    </div>
+                  </div>
+                  <div style={{display:'flex',gap:8,flexShrink:0}}>
+                    <button onClick={()=>editSubmission(selectedClient,sub)} style={{background:C.bl,color:C.bd,border:'none',padding:'7px 14px',borderRadius:6,fontFamily:"'Outfit',sans-serif",fontSize:12,fontWeight:600,cursor:'pointer'}}>✏️ Edit &amp; Update</button>
+                    {hasHtml?(
+                      <>
+                        <button onClick={()=>setViewingDashboard({sub,client:selectedClient})} style={{background:C.s2,color:C.tx,border:`1px solid ${C.bo}`,padding:'7px 14px',borderRadius:6,fontFamily:"'Outfit',sans-serif",fontSize:12,fontWeight:600,cursor:'pointer'}}>👁 View</button>
+                        <button onClick={()=>downloadHistoricalDashboard(sub,selectedClient.business_name)} style={{background:C.gn,color:'#fff',border:'none',padding:'7px 14px',borderRadius:6,fontFamily:"'Outfit',sans-serif",fontSize:12,fontWeight:600,cursor:'pointer'}}>⬇ Download</button>
+                      </>
+                    ):(
+                      <span style={{fontSize:11,color:C.t3,padding:'7px 14px',fontStyle:'italic'}}>No dashboard saved</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* ═══ VIEW HISTORICAL DASHBOARD ═══ */}
+      {page==='clients'&&viewingDashboard&&(
+        <div style={{maxWidth:960,margin:'0 auto',padding:'28px 40px 80px'}}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,marginBottom:20}}>
+            <div style={{display:'flex',alignItems:'center',gap:12}}>
+              <button onClick={()=>setViewingDashboard(null)} style={{background:'none',border:'none',color:C.t2,cursor:'pointer',fontSize:13,fontWeight:500}}>← Back to History</button>
+              <div style={{width:1,height:16,background:C.bo}}/>
+              <div>
+                <div style={{fontFamily:"'EB Garamond',serif",fontSize:18,fontWeight:600,color:C.ch}}>{viewingDashboard.client.business_name} — {viewingDashboard.sub.quarter} {viewingDashboard.sub.year}</div>
+                <div style={{fontSize:11,color:C.t2}}>Submitted {new Date(viewingDashboard.sub.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</div>
+              </div>
+            </div>
+            <div style={{display:'flex',gap:8}}>
+              <button onClick={()=>editSubmission(viewingDashboard.client,viewingDashboard.sub)} style={{background:C.bl,color:C.bd,border:'none',padding:'8px 16px',borderRadius:6,fontFamily:"'Outfit',sans-serif",fontSize:12,fontWeight:600,cursor:'pointer'}}>✏️ Edit &amp; Update</button>
+              <button onClick={()=>downloadHistoricalDashboard(viewingDashboard.sub,viewingDashboard.client.business_name)} style={{background:C.gn,color:'#fff',border:'none',padding:'8px 16px',borderRadius:6,fontFamily:"'Outfit',sans-serif",fontSize:12,fontWeight:700,cursor:'pointer'}}>⬇ Download</button>
+            </div>
+          </div>
+          <div style={{borderRadius:10,border:`2px solid ${C.blue}`,overflow:'hidden',boxShadow:'0 4px 24px rgba(0,0,0,.1)'}}>
+            <iframe srcDoc={viewingDashboard.sub.dashboard_html} style={{width:'100%',height:'82vh',border:'none'}} title="Historical Dashboard"/>
+          </div>
+        </div>
+      )}
+
     </div>
     </>
   )
