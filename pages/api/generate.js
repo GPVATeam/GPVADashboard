@@ -190,22 +190,21 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: `API error: ${err}` })
     }
 
-    const data = await response.json()
-    let html = data.content.find(c => c.type === 'text')?.text || ''
+const data = await response.json()
+let html = data.content.find(c => c.type === 'text')?.text || ''
 
-    // Remove markdown fences
-    html = html.replace(/^```html\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```\s*$/i, '').trim()
+// Remove markdown fences
+html = html.replace(/^```html\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```\s*$/i, '').trim()
 
-    // Extract HTML document
-    const m = html.match(/<!DOCTYPE html>[\s\S]*<\/html>/i)
-    if (m) html = m[0]
+// Extract HTML document
+const m = html.match(/<!DOCTYPE html>[\s\S]*<\/html>/i)
+if (m) html = m[0]
 
-    if (!html.startsWith('<!DOCTYPE')) {
-      return res.status(500).json({ error: 'Invalid HTML returned. Please try again.' })
-    }
-
-    saveToSupabase(fields, html).catch(console.error)
-    return res.status(200).json({ html, success: true })
+if (!html.startsWith('<!DOCTYPE')) {
+  return res.status(500).json({ error: 'Invalid HTML returned. Please try again.' })
+}
+saveToSupabase(fields, html).catch(console.error)
+return res.status(200).json({ html, success: true })
 
   } catch(e) {
     return res.status(500).json({ error: e.message })
