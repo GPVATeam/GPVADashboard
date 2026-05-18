@@ -496,8 +496,12 @@ export default function Home() {
               <button onClick={downloadDashboard} style={{background:C.gn,color:'#fff',border:'none',padding:'10px 24px',borderRadius:7,fontFamily:"'Outfit',sans-serif",fontSize:13,fontWeight:700,cursor:'pointer'}}>⬇ Download HTML</button>
             </div>
           </div>
-          <div style={{borderRadius:10,border:`2px solid ${C.blue}`,overflow:'hidden',boxShadow:'0 4px 24px rgba(0,0,0,.1)'}}>
-            <iframe srcDoc={dashboardHtml} style={{width:'100%',height:'80vh',border:'none'}} title="Generated Dashboard"/>
+          <div style={{background:C.s,borderRadius:10,border:`1px solid ${C.bo}`,padding:'20px 24px',marginTop:16}}>
+            <div style={{fontSize:13,color:C.t2,marginBottom:16,lineHeight:1.6}}>Dashboard is ready. Click <strong style={{color:C.tx}}>Open in Browser</strong> to view all 9 tabs fully working, then <strong style={{color:C.tx}}>Download HTML</strong> to save for SmartVault delivery.</div>
+            <div style={{display:'flex',gap:10}}>
+              <button onClick={()=>{const blob=new Blob([dashboardHtml],{type:'text/html'});const url=URL.createObjectURL(blob);window.open(url,'_blank')}} style={{background:C.bl,color:C.bd,border:`1.5px solid ${C.blue}`,padding:'12px 24px',borderRadius:7,fontFamily:"'Outfit',sans-serif",fontSize:14,fontWeight:600,cursor:'pointer'}}>👁 Open in Browser</button>
+              <button onClick={downloadDashboard} style={{background:C.gn,color:'#fff',border:'none',padding:'12px 24px',borderRadius:7,fontFamily:"'Outfit',sans-serif",fontSize:14,fontWeight:700,cursor:'pointer'}}>⬇ Download HTML</button>
+            </div>
           </div>
         </div>
       )}
@@ -632,8 +636,12 @@ export default function Home() {
               <button onClick={()=>downloadHistoricalDashboard(viewingDashboard.sub,viewingDashboard.client.business_name)} style={{background:C.gn,color:'#fff',border:'none',padding:'8px 16px',borderRadius:6,fontFamily:"'Outfit',sans-serif",fontSize:12,fontWeight:700,cursor:'pointer'}}>⬇ Download</button>
             </div>
           </div>
-          <div style={{borderRadius:10,border:`2px solid ${C.blue}`,overflow:'hidden',boxShadow:'0 4px 24px rgba(0,0,0,.1)'}}>
-            <iframe srcDoc={viewingDashboard.sub.dashboard_html} style={{width:'100%',height:'82vh',border:'none'}} title="Historical Dashboard"/>
+          <div style={{background:C.s,borderRadius:10,border:`1px solid ${C.bo}`,padding:'20px 24px',marginTop:16}}>
+            <div style={{fontSize:13,color:C.t2,marginBottom:16}}>Click to open this dashboard with all tabs fully working.</div>
+            <div style={{display:'flex',gap:10}}>
+              <button onClick={()=>{const blob=new Blob([viewingDashboard.sub.dashboard_html],{type:'text/html'});const url=URL.createObjectURL(blob);window.open(url,'_blank')}} style={{background:C.bl,color:C.bd,border:`1.5px solid ${C.blue}`,padding:'12px 24px',borderRadius:7,fontFamily:"'Outfit',sans-serif",fontSize:14,fontWeight:600,cursor:'pointer'}}>👁 Open in Browser</button>
+              <button onClick={()=>downloadHistoricalDashboard(viewingDashboard.sub,viewingDashboard.client.business_name)} style={{background:C.gn,color:'#fff',border:'none',padding:'12px 24px',borderRadius:7,fontFamily:"'Outfit',sans-serif",fontSize:14,fontWeight:700,cursor:'pointer'}}>⬇ Download HTML</button>
+            </div>
           </div>
         </div>
       )}
