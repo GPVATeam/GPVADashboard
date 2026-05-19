@@ -35,16 +35,16 @@ const Card = ({num,title,badge,badgeColor,children}) => (
 
 const DOCS = [
   {n:"P&L by Month — YTD",d:"QBO → P&L → Columns: Month → Export Excel",t:"core"},
-  {n:"P&L — Trailing 12 Months",d:"Same report, rolling 12-month range",t:"core"},
+  {n:"P&L by Month — Prior Calendar Year",d:"Same report, prior full year by month",t:"core"},
   {n:"Balance Sheet",d:"QBO → Balance Sheet → as of period end",t:"core"},
-  {n:"General Ledger YTD",d:"QBO → GL → full year",t:"core"},
+  {n:"General Ledger — YTD",d:"QBO → GL → full year, all accounts",t:"core"},
+  {n:"General Ledger — Prior Calendar Year",d:"Same report, prior full year",t:"core"},
   {n:"Payroll Register — YTD",d:"Gusto / ADP / QBO Payroll",t:"core"},
   {n:"Payroll Register — Prior Year",d:"Same format, prior full year",t:"core"},
   {n:"Production by Provider — YTD",d:"IDEXX / Cornerstone → Provider Production",t:"core"},
   {n:"Production by Provider — Prior Year",d:"Same report, prior year range",t:"core"},
   {n:"Owner Paystub(s)",d:"PDF is fine — one per owner",t:"tax"},
   {n:"Spouse Paystub",d:"If applicable — PDF is fine",t:"tax"},
-  {n:"Prior Year Tax Return (1040)",d:"For safe harbor — when available",t:"tax"},
   {n:"Lab Contract",d:"For rate and expiration analysis",t:"ops"},
 ]
 
@@ -497,10 +497,11 @@ export default function Home() {
             </div>
           </div>
           <div style={{background:C.s,borderRadius:10,border:`1px solid ${C.bo}`,padding:'20px 24px',marginTop:16}}>
-            <div style={{fontSize:13,color:C.t2,marginBottom:16,lineHeight:1.6}}>Dashboard is ready. Click <strong style={{color:C.tx}}>Open in Browser</strong> to view all 9 tabs fully working, then <strong style={{color:C.tx}}>Download HTML</strong> to save for SmartVault delivery.</div>
+            <div style={{fontSize:13,color:C.t2,marginBottom:16,lineHeight:1.6}}>
+              Dashboard is ready. Click <strong style={{color:C.tx}}>Download HTML</strong> — the file saves to your Downloads folder. Double-click it to open in Chrome and view all 9 tabs. Then upload to SmartVault for client delivery.
+            </div>
             <div style={{display:'flex',gap:10}}>
-              <button onClick={()=>{const blob=new Blob([dashboardHtml],{type:'text/html'});const url=URL.createObjectURL(blob);window.open(url,'_blank')}} style={{background:C.bl,color:C.bd,border:`1.5px solid ${C.blue}`,padding:'12px 24px',borderRadius:7,fontFamily:"'Outfit',sans-serif",fontSize:14,fontWeight:600,cursor:'pointer'}}>👁 Open in Browser</button>
-              <button onClick={downloadDashboard} style={{background:C.gn,color:'#fff',border:'none',padding:'12px 24px',borderRadius:7,fontFamily:"'Outfit',sans-serif",fontSize:14,fontWeight:700,cursor:'pointer'}}>⬇ Download HTML</button>
+              <button onClick={downloadDashboard} style={{background:C.gn,color:'#fff',border:'none',padding:'14px 32px',borderRadius:7,fontFamily:"'Outfit',sans-serif",fontSize:15,fontWeight:700,cursor:'pointer'}}>⬇ Download Dashboard</button>
             </div>
           </div>
         </div>
@@ -637,10 +638,9 @@ export default function Home() {
             </div>
           </div>
           <div style={{background:C.s,borderRadius:10,border:`1px solid ${C.bo}`,padding:'20px 24px',marginTop:16}}>
-            <div style={{fontSize:13,color:C.t2,marginBottom:16}}>Click to open this dashboard with all tabs fully working.</div>
+            <div style={{fontSize:13,color:C.t2,marginBottom:16}}>Download and open in Chrome to view all 9 tabs.</div>
             <div style={{display:'flex',gap:10}}>
-              <button onClick={()=>{const blob=new Blob([viewingDashboard.sub.dashboard_html],{type:'text/html'});const url=URL.createObjectURL(blob);window.open(url,'_blank')}} style={{background:C.bl,color:C.bd,border:`1.5px solid ${C.blue}`,padding:'12px 24px',borderRadius:7,fontFamily:"'Outfit',sans-serif",fontSize:14,fontWeight:600,cursor:'pointer'}}>👁 Open in Browser</button>
-              <button onClick={()=>downloadHistoricalDashboard(viewingDashboard.sub,viewingDashboard.client.business_name)} style={{background:C.gn,color:'#fff',border:'none',padding:'12px 24px',borderRadius:7,fontFamily:"'Outfit',sans-serif",fontSize:14,fontWeight:700,cursor:'pointer'}}>⬇ Download HTML</button>
+              <button onClick={()=>downloadHistoricalDashboard(viewingDashboard.sub,viewingDashboard.client.business_name)} style={{background:C.gn,color:'#fff',border:'none',padding:'12px 24px',borderRadius:7,fontFamily:"'Outfit',sans-serif",fontSize:14,fontWeight:700,cursor:'pointer'}}>⬇ Download Dashboard</button>
             </div>
           </div>
         </div>
